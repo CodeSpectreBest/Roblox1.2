@@ -2,7 +2,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
    Name = "Secret Hub | Premium Edition",
-   LoadingTitle = "Secret Hub Yükleniyor...",
+   LoadingTitle = "Secret Hub Loading...",
    LoadingSubtitle = "by AI Assistant",
    ConfigurationSaving = { Enabled = true, Folder = "SecretHubConfigs" },
    KeySystem = false
