@@ -1,8 +1,10 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()local Window = Rayfield:CreateWindow({
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
    Name = "Secret Hub | Premium",
-   LoadingTitle = "Secret Hub Hazırlanıyor...",
+   LoadingTitle = "Secret Hub Yükleniyor...",
    LoadingSubtitle = "by EzFo",
-   ConfigurationSaving = { Enabled = true, Folder = "SecretHubConfigs" },
+   ConfigurationSaving = { Enabled = false },
    KeySystem = false
 })
 
@@ -24,8 +26,7 @@ local Config = {
     GrabMode = "None",
     GrabRange = 30,
     GrabPower = 100,
-    TeleEnabled = false,
-    TeleMode = "Tornado",
+    TeleEnabled = false,    TeleMode = "Tornado",
     ESP = false
 }
 
@@ -33,11 +34,9 @@ local flyConnection = nil
 local angle = 0
 
 -- ================= SEKME OLUŞTURMA =================
--- Not: Bunlar Window değişkenine bağlı olmalı!
 local PlayerTab = Window:CreateTab("Oyuncu", 4483362458)
 local AuraTab = Window:CreateTab("Grab Auraları", 10952479675)
-local CombatTab = Window:CreateTab("Savaş & Fling", 4483362458)
-local TeleTab = Window:CreateTab("Telekinesis", 10952479675)
+local CombatTab = Window:CreateTab("Savaş & Fling", 4483362458)local TeleTab = Window:CreateTab("Telekinesis", 10952479675)
 local VisualsTab = Window:CreateTab("Görsel & ESP", 4483362458)
 
 -- ================= OYUNCU AYARLARI =================
@@ -45,14 +44,14 @@ PlayerTab:CreateToggle({
     Name = "Uçma (Fly)",
     CurrentValue = false,
     Callback = function(Toggled)
-        Config.FlyEnabled = Toggled        local char = LocalPlayer.Character
+        Config.FlyEnabled = Toggled
+        local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         
         if Toggled then
             if hum then hum.PlatformStand = true end
-            flyConnection = runService.RenderStepped:Connect(function(dt)
-                local moveDir = Vector3.new(0,0,0)
+            flyConnection = runService.RenderStepped:Connect(function(dt)                local moveDir = Vector3.new(0,0,0)
                 if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += camera.CFrame.LookVector end
                 if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= camera.CFrame.LookVector end
                 if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += camera.CFrame.RightVector end
@@ -73,8 +72,7 @@ PlayerTab:CreateToggle({
 
 PlayerTab:CreateSlider({
     Name = "Fly Hızı",
-    Range = {10, 500},
-    Increment = 5,
+    Range = {10, 500},    Increment = 5,
     CurrentValue = 50,
     Callback = function(v) Config.FlySpeed = v end,
 })
@@ -108,13 +106,14 @@ CombatTab:CreateToggle({
     Callback = function(v) Config.AntiGrab = v end,
 })
 
-CombatTab:CreateToggle({    Name = "Spin Fling",
+CombatTab:CreateToggle({
+    Name = "Spin Fling",
     CurrentValue = false,
     Callback = function(v) Config.Fling = v end,
 })
 
--- ================= TELEKINESIS SEKMESİ =================TeleTab:CreateToggle({
-    Name = "Telekinesis Aktif",
+-- ================= TELEKINESIS SEKMESİ =================
+TeleTab:CreateToggle({    Name = "Telekinesis Aktif",
     CurrentValue = false,
     Callback = function(v) Config.TeleEnabled = v end,
 })
@@ -132,20 +131,17 @@ runService.Heartbeat:Connect(function()
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    -- Anti-Grab Logic
     if Config.AntiGrab then
         for _, v in pairs(char:GetDescendants()) do
             if v:IsA("Weld") or v:IsA("ManualWeld") or v:IsA("BallSocketConstraint") then v:Destroy() end
         end
     end
 
-    -- Fling Logic
     if Config.Fling then
         hrp.Velocity = Vector3.new(0, 5000, 0)
         hrp.RotVelocity = Vector3.new(0, Config.FlingPower, 0)
     end
 
-    -- Grab Auras & Telekinesis Logic
     angle = angle + 0.1
     local count = 0
     for _, obj in pairs(workspace:GetDescendants()) do
