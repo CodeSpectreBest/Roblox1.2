@@ -1,288 +1,232 @@
-local TeleTab = Window:CreateTab("Telekinesis", 10952479675)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Settings (defaults)
-local Tele = {
-    Enabled = false,
-    Mode = "Tornado",            -- "Tornado", "Ring", "Portal", "Orbit"
-    Range = 50,                  -- 1-200
-    SphereSize = 20,             -- 1-200
-    Force = 30,                  -- 0-100 (visual speed)
-    MaxTargets = 80
+local Window = Rayfield:CreateWindow({
+   Name = "Secret Hub | Premium Edition",
+   LoadingTitle = "Secret Hub Yükleniyor...",
+   LoadingSubtitle = "by AI Assistant",
+   ConfigurationSaving = { Enabled = true, Folder = "SecretHubConfigs" },
+   KeySystem = false
+})
+
+-- SERVİSLERlocal Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local runService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local camera = workspace.CurrentCamera
+
+-- AYARLAR (CONFIG)
+local Config = {
+    FlyEnabled = false,    FlySpeed = 50,
+    WalkSpeed = 16,
+    JumpPower = 50,
+    InfZoom = false,
+    AntiGrab = false,
+    Fling = false,    FlingPower = 10000,
+    -- Grab Auras
+    GrabMode = "None",
+    GrabRange = 30,
+    GrabPower = 100,
+    -- Telekinesis
+    TeleEnabled = false,
+    TeleMode = "Tornado",
+    -- Visuals
+    ESP = false
 }
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
-
--- internal state
-local spherePart = nil
-local grabbed = {}               -- list of parts currently controlled
-local updateConn = nil
+local flyConnection = nil
 local angle = 0
 
--- helper: create sphere visual
-local function createSphere()
-    if spherePart and spherePart.Parent then return end
-    if spherePart then pcall(function() spherePart:Destroy() end) end
-    spherePart = Instance.new("Part")
-    spherePart.Name = "TeleSphere_" .. tostring(LocalPlayer.UserId)
-    spherePart.Shape = Enum.PartType.Ball
-    spherePart.Anchored = true
-    spherePart.CanCollide = false
-    spherePart.Material = Enum.Material.Neon
-    spherePart.Transparency = 0.5
-    spherePart.Color = Color3.fromRGB(255, 50, 50)
-    spherePart.Size = Vector3.new(Tele.SphereSize, Tele.SphereSize, Tele.SphereSize)
-    spherePart.Parent = workspace
-end
+-- SEKMELER
+local MainTab = Window:CreateTab("Ana Menü", 4483362458)
+local PlayerTab = Window:CreateTab("Oyuncu", 4483362458)
+local AuraTab = Window:CreateTab("Grab Auraları", 10952479675)
+local CombatTab = Window:CreateTab("Savaş & Fling", 4483362458)
+local TeleTab = Window:CreateTab("Telekinesis", 10952479675)
+local VisualsTab = Window:CreateTab("Görsel & ESP", 4483362458)
 
-local function destroySphere()
-    if spherePart then
-        pcall(function() spherePart:Destroy() end)
-        spherePart = nil
-    end
-end
+-- ================= OYUNCU SEKMESİ =================
+PlayerTab:CreateToggle({
+    Name = "Uçma (Fly)",    CurrentValue = false,
+    Callback = function(Toggled)
+        Config.FlyEnabled = Toggled
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        
+        if Toggled then
+            if hum then hum.PlatformStand = true end
+            flyConnection = runService.RenderStepped:Connect(function(dt)
+                local moveDir = Vector3.new(0,0,0)
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += camera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= camera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += camera.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= camera.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.new(0, 1, 0) end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir -= Vector3.new(0, 1, 0) end
+                if moveDir.Magnitude > 0 and hrp then
+                    hrp.CFrame = hrp.CFrame + (moveDir.unit * Config.FlySpeed * dt)
+                end
+                if hrp then hrp.Velocity = Vector3.new(0, 0, 0) end
+            end)
+        else
+            if flyConnection then flyConnection:Disconnect() end
+            if hum then hum.PlatformStand = false end
+        end
+    end,
+})
 
--- helper: collect parts (Anchored == false) within range, exclude player chars
-local function collectParts()
-    grabbed = {}
+PlayerTab:CreateSlider({
+    Name = "Fly Hızı",
+    Range = {10, 500},
+    Increment = 5,
+    CurrentValue = 50,
+    Callback = function(v) Config.FlySpeed = v end,
+})
+
+PlayerTab:CreateToggle({
+    Name = "Sınırsız Zoom",
+    CurrentValue = false,
+    Callback = function(v) Config.InfZoom = v end,
+})
+
+-- ================= GRAB AURAS SEKMESİ =================
+AuraTab:CreateDropdown({
+    Name = "Aura Modu",
+    Options = {"None", "Magnet", "Void", "Kill", "Massive Grab", "Glitch Grab", "Kick Grab", "Throw Grab", "Space Grab"},
+    CurrentOption = "None",
+    Callback = function(v) Config.GrabMode = v end,
+})
+
+AuraTab:CreateSlider({
+    Name = "Aura Menzili",
+    Range = {10, 300},
+    Increment = 5,
+    CurrentValue = 30,
+    Callback = function(v) Config.GrabRange = v end,
+})
+
+AuraTab:CreateSlider({
+    Name = "Aura Gücü (Power)",
+    Range = {50, 2000},
+    Increment = 50,
+    CurrentValue = 100,
+    Callback = function(v) Config.GrabPower = v end,
+})
+
+-- ================= SAVAŞ & FLING SEKMESİ =================
+CombatTab:CreateToggle({
+    Name = "Anti-Grab (Seni Tutamazlar)",
+    CurrentValue = false,
+    Callback = function(v) Config.AntiGrab = v end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Spin Fling (Dokunduğunu Uçur)",
+    CurrentValue = false,
+    Callback = function(v) Config.Fling = v end,
+})
+
+-- ================= TELEKINESIS SEKMESİ =================
+TeleTab:CreateToggle({
+    Name = "Telekinesis Aktif",
+    CurrentValue = false,
+    Callback = function(v) Config.TeleEnabled = v end,
+})
+
+TeleTab:CreateDropdown({
+    Name = "Tele Modu",
+    Options = {"Tornado", "Ring"},
+    CurrentOption = "Tornado",
+    Callback = function(v) Config.TeleMode = v end,
+})
+
+-- ================= GÖRSEL (ESP) SEKMESİ =================
+VisualsTab:CreateToggle({
+    Name = "Oyuncu ESP",
+    CurrentValue = false,
+    Callback = function(v)
+        Config.ESP = v
+        if not v then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p.Character and p.Character:FindFirstChild("Highlight") then p.Character.Highlight:Destroy() end
+            end
+        end
+    end,
+})
+
+-- ================= ANA DÖNGÜ (MAIN LOOP) =================
+runService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
-    local charDescendants = {}
-    if char then
-        for _, d in pairs(char:GetDescendants()) do charDescendants[d] = true end
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    -- 1. Anti-Grab
+    if Config.AntiGrab then
+        for _, v in pairs(char:GetDescendants()) do
+            if v:IsA("Weld") or v:IsA("ManualWeld") or v:IsA("BallSocketConstraint") then v:Destroy() end
+        end
     end
 
-    local pos = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.Position or nil
-    if not pos then return end
+    -- 2. Spin Fling
+    if Config.Fling then
+        hrp.Velocity = Vector3.new(0, 5000, 0)
+        hrp.RotVelocity = Vector3.new(0, Config.FlingPower, 0)
+    end
 
-    local cnt = 0
+    -- 3. Grab Auras & Telekinesis Logic
+    angle = angle + 0.1
+    local count = 0
     for _, obj in pairs(workspace:GetDescendants()) do
-        if cnt >= Tele.MaxTargets then break end
-        if obj:IsA("BasePart") then
-            if obj ~= spherePart and not charDescendants[obj] and obj.Parent and not obj:IsDescendantOf(LocalPlayer.Character) then
-                if obj.Anchored == false then
-                    local ok, mag = pcall(function() return (obj.Position - pos).Magnitude end)
-                    if ok and mag and mag <= Tele.Range then
-                        cnt = cnt + 1
-                        grabbed[cnt] = obj
+        if obj:IsA("BasePart") and not obj.Anchored and not obj:IsDescendantOf(char) then
+            local dist = (obj.Position - hrp.Position).Magnitude
+            if dist <= Config.GrabRange then
+                count = count + 1
+                
+                -- GRAB MODLARI
+                if Config.GrabMode == "Magnet" then
+                    obj.CFrame = obj.CFrame:Lerp(hrp.CFrame * CFrame.new(0, 0, -5), 0.2)
+                elseif Config.GrabMode == "Void" then
+                    obj.CFrame = CFrame.new(obj.Position.X, -500, obj.Position.Z)
+                elseif Config.GrabMode == "Kill" then
+                    obj.CFrame = hrp.CFrame * CFrame.new(0, 0, -5)
+                    obj.RotVelocity = Vector3.new(0, 10000, 0)
+                elseif Config.GrabMode == "Massive Grab" then
+                    obj.CFrame = hrp.CFrame * CFrame.new(0, 15, 0)
+                elseif Config.GrabMode == "Glitch Grab" then                    obj.CFrame = obj.CFrame * CFrame.new(math.random(-1,1), 0, math.random(-1,1))
+                    obj.RotVelocity = Vector3.new(500, 500, 500)
+                elseif Config.GrabMode == "Kick Grab" then
+                    obj.Velocity = (obj.Position - hrp.Position).unit * Config.GrabPower                elseif Config.GrabMode == "Throw Grab" then
+                    obj.CFrame = hrp.CFrame * CFrame.new(0, 0, -5)
+                    obj.Velocity = camera.CFrame.LookVector * Config.GrabPower
+                elseif Config.GrabMode == "Space Grab" then
+                    obj.Velocity = Vector3.new(0, Config.GrabPower, 0)
+                end
+
+                -- TELEKINESIS MODLARI (Eğer Aura None ise çalışır)
+                if Config.TeleEnabled and Config.GrabMode == "None" then
+                    if Config.TeleMode == "Tornado" then
+                        local offset = Vector3.new(math.cos(angle + count)*15, count, math.sin(angle + count)*15)
+                        obj.CFrame = obj.CFrame:Lerp(hrp.CFrame * CFrame.new(offset), 0.1)
+                    elseif Config.TeleMode == "Ring" then
+                        local offset = Vector3.new(math.cos(angle + count)*20, 0, math.sin(angle + count)*20)
+                        obj.CFrame = obj.CFrame:Lerp(hrp.CFrame * CFrame.new(offset), 0.1)
                     end
                 end
             end
         end
     end
-end
 
--- helper: release grabbed parts (restore anchored = false)
-local function releaseAll()
-    for _, p in pairs(grabbed) do
-        if p and p.Parent then
-            p.Anchored = false
-        end
-    end
-    grabbed = {}
-end
+    -- 4. Infinite Zoom
+    if Config.InfZoom then LocalPlayer.CameraMaxZoomDistance = 100000 end
 
--- mode behaviours
-local Modes = {}
-
--- Tornado: vertical spiral upward around player
-Modes["Tornado"] = function(hrp, t)
-    angle = angle + (Tele.Force * 0.02)
-    for i, part in ipairs(grabbed) do
-        if part and part.Parent then
-            local idx = i
-            local theta = angle + idx * 0.6
-            local height = ((idx-1) % math.max(1, math.floor(#grabbed/6)+1)) * (Tele.SphereSize/4) + math.sin(t*2 + idx) * 0.5
-            local radius = math.max(1, Tele.SphereSize/4)
-            local offset = Vector3.new(math.cos(theta) * radius, height, math.sin(theta) * radius)
-            local targetCFrame = hrp.CFrame * CFrame.new(0, 0, 0) * CFrame.new(offset)
-            -- smooth move by lerping CFrame
-            pcall(function()
-                part.Anchored = true
-                part.CFrame = targetCFrame
-            end)
-        end
-    end
-end
-
--- Ring: horizontal ring at specified height
-Modes["Ring"] = function(hrp, t)
-    angle = angle + (Tele.Force * 0.015)
-    local n = #grabbed
-    if n == 0 then return end
-    for i, part in ipairs(grabbed) do
-        if part and part.Parent then
-            local theta = angle + (i / n) * math.pi * 2
-            local radius = math.max(1, Tele.SphereSize/2)
-            local y = Tele.SphereSize * 0.1 -- small offset; sphere sits at hrp + sphereHeight below
-            local offset = Vector3.new(math.cos(theta) * radius, y + Tele.SphereSize * 0.0, math.sin(theta) * radius + Tele.SphereSize/6)
-            local targetCFrame = hrp.CFrame * CFrame.new(offset)
-            pcall(function()
-                part.Anchored = true
-                part.CFrame = targetCFrame
-            end)
-        end
-    end
-end
-
--- Portal: swirling blob in front of player
-Modes["Portal"] = function(hrp, t)
-    angle = angle + (Tele.Force * 0.02)
-    for i, part in ipairs(grabbed) do
-        if part and part.Parent then
-            local theta = angle + i * 0.4
-            local r = math.max(1, Tele.SphereSize/3)
-            local x = math.sin(theta) * r
-            local y = math.cos(theta * 0.7) * (Tele.SphereSize/2)
-            local z = math.cos(theta) * (r/2)
-            local offset = Vector3.new(x, y, -Tele.SphereSize*0.2 + z)
-            local targetCFrame = hrp.CFrame * CFrame.new(offset)
-            pcall(function()
-                part.Anchored = true
-                part.CFrame = targetCFrame
-            end)
-        end
-    end
-end
-
-Modes["Orbit"] = function(hrp, t)
-    angle = angle + (Tele.Force * 0.02)
-    for i, part in ipairs(grabbed) do
-        if part and part.Parent then
-            local theta = angle + i * 0.5
-            local r = math.max(1, Tele.SphereSize/3)
-            local offset = Vector3.new(math.cos(theta)*r, Tele.SphereSize*0.1, math.sin(theta)*r)
-            local targetCFrame = hrp.CFrame * CFrame.new(offset)
-            pcall(function()
-                part.Anchored = true
-                part.CFrame = targetCFrame
-            end)
-        end
-    end
-end
-
--- start/stop update loop
-local function startUpdate()
-    if updateConn then return end
-    angle = 0
-    updateConn = RunService.RenderStepped:Connect(function(dt)
-        local char = LocalPlayer.Character
-        if not char then return end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-
-        if Tele.Enabled then
-            -- update sphere
-            if not spherePart then createSphere() end
-            spherePart.Size = Vector3.new(Tele.SphereSize, Tele.SphereSize, Tele.SphereSize)
-            spherePart.Position = hrp.Position + Vector3.new(0, Tele.SphereSize * 0.2, 0)
-
-            -- collect targets periodically
-            collectParts()
-
-            -- apply mode
-            local modeFn = Modes[Tele.Mode]
-            if modeFn and #grabbed > 0 then
-                modeFn(hrp, tick())
+    -- 5. ESP
+    if Config.ESP then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and not p.Character:FindFirstChild("Highlight") then
+                Instance.new("Highlight", p.Character)
             end
-        else
-            -- ensure cleanup if disabled
-            if spherePart then destroySphere() end
-            releaseAll()
         end
-    end)
-end
-
-local function stopUpdate()
-    if updateConn then
-        updateConn:Disconnect()
-        updateConn = nil
     end
-    destroySphere()
-    releaseAll()
-end
+end)
 
--- start the updater now (keeps UI responsive)
-startUpdate()
-
--- ========= RAYFIELD UI CREATION =========
-
--- big toggle
-TeleTab:CreateToggle({
-    Name = "Telekinesis Aç/Kapa",
-    CurrentValue = false,
-    Flag = "TeleToggle",
-    Callback = function(state)
-        Tele.Enabled = state
-        if not state then
-            -- releasing everything when turned off
-            releaseAll()
-            destroySphere()
-        else
-            createSphere()
-            collectParts()
-        end
-    end,
-})
-
--- Mode dropdown
-TeleTab:CreateDropdown({
-    Name = "Mode",
-    Options = {"Tornado", "Ring", "Portal", "Orbit"},
-    CurrentOption = Tele.Mode,
-    Flag = "TeleMode",
-    Callback = function(opt)
-        Tele.Mode = opt
-    end,
-})
-
--- Range slider 1-200
-TeleTab:CreateSlider({
-    Name = "Range",
-    Range = {1, 200},
-    Increment = 1,
-    CurrentValue = Tele.Range,
-    Flag = "TeleRange",
-    Callback = function(v)
-        Tele.Range = math.clamp(math.floor(v), 1, 200)
-    end,
-})
-
--- Sphere size slider 1-200
-TeleTab:CreateSlider({
-    Name = "Sphere Size",
-    Range = {1, 200},
-    Increment = 1,
-    CurrentValue = Tele.SphereSize,
-    Flag = "TeleSphereSize",
-    Callback = function(v)
-        Tele.SphereSize = math.clamp(math.floor(v), 1, 200)
-        if spherePart then spherePart.Size = Vector3.new(Tele.SphereSize, Tele.SphereSize, Tele.SphereSize) end
-    end,
-})
-
--- Force slider 0-100
-TeleTab:CreateSlider({
-    Name = "Force (Speed)",
-    Range = {0, 100},
-    Increment = 1,
-    CurrentValue = Tele.Force,
-    Flag = "TeleForce",
-    Callback = function(v)
-        Tele.Force = math.clamp(v, 0, 100)
-    end,
-})
-
--- Disconnect all button
-TeleTab:CreateButton({
-    Name = "Disconnect All Objects",
-    Callback = function()
-        releaseAll()
-        destroySphere()
-        Tele.Enabled = false
-        -- update toggle state in UI (if saved in config)
-        pcall(function() Rayfield:Notify({Title="Telekinesis", Content="All objects released", Duration=2}) end)
-    end,
-})
-
--- Done
+Rayfield:Notify({Title = "Secret Hub", Content = "Premium Sistem Hazır!", Duration = 5})
