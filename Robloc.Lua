@@ -1,6 +1,4 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
-local Window = Rayfield:CreateWindow({
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()local Window = Rayfield:CreateWindow({
    Name = "Secret Hub | Premium V2",
    LoadingTitle = "Secret Hub Loading...",
    LoadingSubtitle = "by mystery man",
@@ -14,10 +12,11 @@ local Window = Rayfield:CreateWindow({
       SaveKey = true,
       Key = {"Secret123"}
    }
-})-- Ayarlar
+})
+
+-- Ayarlar
 local Config = {
-    Fly = false,
-    FlySpeed = 50,
+    Fly = false,    FlySpeed = 70,
     WalkSpeed = 16,
     JumpPower = 50,
     InfZoom = false,
@@ -44,21 +43,23 @@ local CombatTab = Window:CreateTab("Combat", 4483362458)
 local VisualsTab = Window:CreateTab("Visuals", 4483362458)
 
 -- ================= PLAYER =================
-PlayerTab:CreateToggle({
-    Name = "Fly (Stable)",
+local FlyToggle = PlayerTab:CreateToggle({    Name = "Fly (Stable) [F]",
     CurrentValue = false,
-    Callback = function(v) Config.Fly = v end,
+    Callback = function(v) 
+        Config.Fly = v 
+        if not v and LP.Character and LP.Character:FindFirstChildOfClass("Humanoid") then
+            LP.Character:FindFirstChildOfClass("Humanoid").PlatformStand = false
+        end
+    end,
 })
 
 PlayerTab:CreateSlider({
     Name = "Fly Speed",
-    Range = {10, 500},
+    Range = {10, 200},
     Increment = 5,
-    CurrentValue = 50,
+    CurrentValue = 70,
     Callback = function(v) Config.FlySpeed = v end,
-})
-
-PlayerTab:CreateSlider({
+})PlayerTab:CreateSlider({
     Name = "WalkSpeed",
     Range = {16, 500},
     Increment = 1,
@@ -92,9 +93,7 @@ AuraTab:CreateToggle({
     Name = "Telekinesis (Orbit)",
     CurrentValue = false,
     Callback = function(v) Config.TeleActive = v end,
-})
-
-AuraTab:CreateSlider({
+})AuraTab:CreateSlider({
     Name = "Range",
     Range = {10, 500},
     Increment = 10,
@@ -107,7 +106,9 @@ CombatTab:CreateToggle({
     Name = "Anti-Grab (Aggressive)",
     CurrentValue = false,
     Callback = function(v) Config.AntiGrab = v end,
-})CombatTab:CreateToggle({
+})
+
+CombatTab:CreateToggle({
     Name = "Spin Fling",
     CurrentValue = false,
     Callback = function(v) Config.Fling = v end,
@@ -125,25 +126,39 @@ VisualsTab:CreateToggle({
                     p.Character.SecretESP:Destroy()
                 end
             end
-        end    end,
+        end
+    end,
 })
 
--- ================= CORE LOOP (DÖNGÜ) =================
+-- ================= CORE LOGIC =================
+
+-- F Tuşu ile Fly Aç/Kapat
+UIS.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == Enum.KeyCode.F then
+        Config.Fly = not Config.Fly
+        FlyToggle:Set(Config.Fly)
+    end
+end)
+
 local angle = 0
 RS.Heartbeat:Connect(function(dt)
     local char = LP.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not char then return end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
     
     if hrp and hum then
-        -- Speed & Jump
-        hum.WalkSpeed = Config.WalkSpeed
-        hum.JumpPower = Config.JumpPower
+        -- Speed & Jump (Normal moddayken)
+        if not Config.Fly then
+            hum.WalkSpeed = Config.WalkSpeed
+            hum.JumpPower = Config.JumpPower
+        end
 
-        -- Fly (Yerçekimi iptal edildi)
+        -- Uçma Mantığı (PlatformStand ile düşme engellenir)
         if Config.Fly then
             hum.PlatformStand = true
-            local moveDir = Vector3.new(0,0,0)
+            local moveDir = Vector3.new(0,0,0)            
             if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir += Camera.CFrame.LookVector end
             if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir -= Camera.CFrame.LookVector end
             if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir += Camera.CFrame.RightVector end
@@ -151,51 +166,43 @@ RS.Heartbeat:Connect(function(dt)
             if UIS:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.new(0, 1, 0) end
             if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir -= Vector3.new(0, 1, 0) end
             
-            hrp.CFrame = hrp.CFrame + (moveDir * Config.FlySpeed * dt)
             hrp.Velocity = Vector3.new(0, 0, 0)
-        else
-            hum.PlatformStand = false
-        end        -- Anti-Grab
+            hrp.CFrame = hrp.CFrame + (moveDir * Config.FlySpeed * dt)        end
+
+        -- Anti-Grab
         if Config.AntiGrab then
             for _, v in pairs(char:GetDescendants()) do
-                if v:IsA("Constraint") or v:IsA("Weld") or v:IsA("ManualWeld") then
+                if v:IsA("Weld") or v:IsA("ManualWeld") or v:IsA("Constraint") then
                     v:Destroy()
                 end
             end
-        end        -- Spin Fling
-        if Config.Fling then
-            hrp.Velocity = Vector3.new(0, 5000, 0)
-            hrp.RotVelocity = Vector3.new(0, 10000, 0)
         end
 
-        -- Grab Auras & Telekinesis
+        -- Spin Fling
+        if Config.Fling then
+            hrp.RotVelocity = Vector3.new(0, 10000, 0)
+            hrp.Velocity = Vector3.new(0, 5000, 0)
+        end
+
+        -- Grab Auras
         angle = angle + 0.05
-        local count = 0
         if Config.GrabMode ~= "None" or Config.TeleActive then
-            for _, obj in pairs(workspace:GetDescendants()) do
-                if obj:IsA("BasePart") and not obj.Anchored and not obj:IsDescendantOf(char) then
+            for _, obj in pairs(workspace:GetChildren()) do
+                if obj:IsA("BasePart") and not obj.Anchored then
                     local dist = (obj.Position - hrp.Position).Magnitude
                     if dist <= Config.GrabRange then
-                        count = count + 1
                         LP.SimulationRadius = 1000
-                        
                         if Config.TeleActive then
-                            local x = math.cos(angle + count) * 15
-                            local z = math.sin(angle + count) * 15
-                            obj.CFrame = obj.CFrame:Lerp(hrp.CFrame * CFrame.new(x, 5, z), 0.1)
+                            local x = math.cos(angle) * 15
+                            local z = math.sin(angle) * 15
+                            obj.CFrame = obj.CFrame:Lerp(hrp.CFrame * CFrame.new(x, 5, z), 0.2)
                         elseif Config.GrabMode == "Magnet" then
                             obj.CFrame = hrp.CFrame * CFrame.new(0, 0, -10)
                         elseif Config.GrabMode == "Void" then
                             obj.CFrame = CFrame.new(obj.Position.X, -500, obj.Position.Z)
-                        elseif Config.GrabMode == "Kill" then
-                            obj.CFrame = hrp.CFrame * CFrame.new(0, 0, -5)
-                            obj.RotVelocity = Vector3.new(0, 15000, 0)
-                        elseif Config.GrabMode == "Throw" then
-                            obj.Velocity = Camera.CFrame.LookVector * Config.GrabPower
                         end
                     end
-                end
-            end
+                end            end
         end
 
         -- ESP
@@ -212,7 +219,6 @@ RS.Heartbeat:Connect(function(dt)
 
         -- Inf Zoom
         if Config.InfZoom then LP.CameraMaxZoomDistance = 100000 end
-    end
-end)
+    endend)
 
-Rayfield:Notify({Title = "Secret Hub", Content = "Script Fully Operational!", Duration = 5})
+Rayfield:Notify({Title = "Secret Hub", Content = "Hub Başarıyla Yüklendi!", Duration = 5})
